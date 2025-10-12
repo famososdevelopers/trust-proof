@@ -12,7 +12,6 @@ import { z } from 'zod';
 const authSchema = z.object({
   email: z.string().email({ message: 'Email inválido' }),
   password: z.string().min(6, { message: 'La contraseña debe tener al menos 6 caracteres' }),
-  name: z.string().min(2, { message: 'El nombre debe tener al menos 2 caracteres' }).optional(),
 });
 
 const Auth = () => {
@@ -22,7 +21,6 @@ const Auth = () => {
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    name: '',
   });
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -30,11 +28,7 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const validationData = isLogin 
-        ? { email: formData.email, password: formData.password }
-        : formData;
-      
-      authSchema.parse(validationData);
+      authSchema.parse(formData);
 
       if (isLogin) {
         const { error } = await supabase.auth.signInWithPassword({
@@ -57,9 +51,6 @@ const Auth = () => {
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/`,
-          },
         });
 
         if (signUpError) {
@@ -77,7 +68,7 @@ const Auth = () => {
             .insert({
               id: authData.user.id,
               email: formData.email,
-              name: formData.name,
+              name: formData.email.split('@')[0],
               role: 'user',
             });
 
@@ -85,8 +76,8 @@ const Auth = () => {
             console.error('Error creating user profile:', profileError);
           }
 
-          toast.success('Cuenta creada exitosamente. Por favor verifica tu email.');
-          setIsLogin(true);
+          toast.success('Cuenta creada exitosamente');
+          navigate('/');
         }
       }
     } catch (error) {
@@ -116,20 +107,6 @@ const Auth = () => {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Nombre completo</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Juan Pérez"
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  required={!isLogin}
-                />
-              </div>
-            )}
-            
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
