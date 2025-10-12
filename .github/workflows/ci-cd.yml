@@ -43,43 +43,17 @@ jobs:
         path: dist/
         retention-days: 7
 
-  deploy-preview:
-    needs: build-and-test
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    
-    steps:
-    - name: Comment PR
-      uses: actions/github-script@v7
-      with:
-        script: |
-          github.rest.issues.createComment({
-            issue_number: context.issue.number,
-            owner: context.repo.owner,
-            repo: context.repo.repo,
-            body: '✅ Build exitoso! Los tests pasaron correctamente.\n\n📦 Artifact: `build-${{ github.sha }}`'
-          })
-
-  deploy-production:
+  deploy-status:
     needs: build-and-test
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-    
-    - name: Download build artifacts
-      uses: actions/download-artifact@v4
-      with:
-        name: build-${{ github.sha }}
-        path: dist/
-    
-    - name: Deploy to Vercel
-      uses: amondnet/vercel-action@v25
-      with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-        vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-        vercel-args: '--prod'
-        working-directory: ./
+    - name: Deployment notification
+      run: |
+        echo "✅ Build successful!"
+        echo "🚀 Vercel will automatically deploy this commit"
+        echo "📦 Commit SHA: ${{ github.sha }}"
+        echo "👤 Triggered by: ${{ github.actor }}"
+        echo ""
+        echo "Check your deployment at: https://vercel.com"
