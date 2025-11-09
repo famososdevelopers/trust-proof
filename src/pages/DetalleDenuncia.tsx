@@ -260,6 +260,7 @@ const DetalleDenuncia = () => {
               <Button
                 variant={isLiked ? 'default' : 'outline'}
                 onClick={handleLike}
+                aria-label={isLiked ? 'Quitar like a la denuncia' : 'Dar like a la denuncia'}
                 className={cn(
                   "space-x-2",
                   isLiked && "bg-destructive hover:bg-destructive/90"
@@ -316,6 +317,7 @@ const DetalleDenuncia = () => {
                         <Button
                           variant="ghost"
                           size="sm"
+                          aria-label="Eliminar comentario"
                           onClick={() => handleDeleteComentario(comentario.id)}
                         >
                           <Trash2 className="h-4 w-4 text-destructive" />

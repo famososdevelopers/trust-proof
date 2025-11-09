@@ -1,6 +1,10 @@
 import '@testing-library/jest-dom';
 import { cleanup } from '@testing-library/react';
-import { afterEach, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, vi } from 'vitest';
+import { setupServer } from 'msw/node';
+
+import { handlers } from './mocks/supabase/handlers';
+import { __resetSupabaseMock } from './mocks/supabase/client';
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {
@@ -36,7 +40,28 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
 } as any;
 
-// Cleanup after each test
-afterEach(() => {
-  cleanup();
+vi.mock('sonner', () => {
+  const toastFn = Object.assign(vi.fn(), {
+    success: vi.fn(),
+    error: vi.fn(),
+  });
+
+  return {
+    Toaster: () => null,
+    toast: toastFn,
+  };
 });
+
+vi.mock('@/integrations/supabase/client', () => import('./mocks/supabase/client'));
+
+const server = setupServer(...handlers);
+
+beforeAll(() => server.listen());
+
+afterEach(async () => {
+  cleanup();
+  server.resetHandlers();
+  await __resetSupabaseMock();
+});
+
+afterAll(() => server.close());
