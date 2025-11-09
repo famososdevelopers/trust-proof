@@ -39,6 +39,8 @@ const Auth = () => {
         if (error) {
           if (error.message.includes('Invalid login credentials')) {
             toast.error('Credenciales inválidas');
+          } else if (error.message.includes('Email not confirmed')) {
+            toast.error('Por favor verifica tu email antes de iniciar sesión');
           } else {
             toast.error(error.message);
           }
@@ -51,6 +53,9 @@ const Auth = () => {
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/verification-success`,
+          },
         });
 
         if (signUpError) {
@@ -62,23 +67,26 @@ const Auth = () => {
           return;
         }
 
-        if (authData.user) {
-          const { error: profileError } = await supabase
-            .from('users')
-            .insert({
-              id: authData.user.id,
-              email: formData.email,
-              name: formData.email.split('@')[0],
-              role: 'user',
-            });
+        toast.success('Por favor verifica tu email para continuar');
+        navigate('/verify-email');
 
-          if (profileError) {
-            console.error('Error creating user profile:', profileError);
-          }
+        // if (authData.user) {
+        //   const { error: profileError } = await supabase
+        //     .from('users')
+        //     .insert({
+        //       id: authData.user.id,
+        //       email: formData.email,
+        //       name: formData.email.split('@')[0],
+        //       role: 'user',
+        //     });
 
-          toast.success('Cuenta creada exitosamente');
-          navigate('/');
-        }
+        //   if (profileError) {
+        //     console.error('Error creating user profile:', profileError);
+        //   }
+
+        //   toast.success('Cuenta creada exitosamente');
+        //   navigate('/');
+        // }
       }
     } catch (error) {
       if (error instanceof z.ZodError) {

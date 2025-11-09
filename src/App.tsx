@@ -15,6 +15,8 @@ import Perfil from "./pages/Perfil";
 import Moderacion from "./pages/Moderacion";
 import ProtectedRoute from "./components/ProtectedRoute";
 import NotFound from "./pages/NotFound";
+import VerifyEmail from "./pages/VerifyEmail";
+import VerificationSuccess from "./pages/VerificationSuccess";
 
 const queryClient = new QueryClient();
 
@@ -22,10 +24,30 @@ const AppRoutes = () => {
   const { setSession, setLoading, user } = useAuthStore();
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setSession(session);
-      setLoading(false);
-    });
+    
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        setLoading(false);
+
+        if (event === 'SIGNED_IN' && session) {
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('id')
+            .eq('id', session.user.id)
+            .single();
+
+          if (!existingUser) {
+            await supabase.from('users').insert({
+              id: session.user.id,
+              email: session.user.email,
+              name: session.user.email?.split('@')[0],
+              role: 'user',
+            });
+          }
+        }
+      }
+    );
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -38,6 +60,8 @@ const AppRoutes = () => {
   return (
     <Routes>
       <Route path="/auth" element={user ? <Navigate to="/" replace /> : <Auth />} />
+      <Route path="/verify-email" element={<VerifyEmail />} />
+      <Route path="/verification-success" element={<VerificationSuccess />} />
       <Route
         path="/"
         element={
