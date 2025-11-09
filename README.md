@@ -1,73 +1,87 @@
-# Welcome to your Lovable project
+# TrustProof 🛡️
 
-## Project info
+**Plataforma centralizada de denuncias de estafadores para prevenir fraudes en transacciones entre particulares**
 
-**URL**: https://lovable.dev/projects/f4c3a6cf-a771-4f10-97b4-fd700ec92064
+[![CI/CD Pipeline](https://github.com/famososdevelopers/trust-proof/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/famososdevelopers/trust-proof/actions)
 
-## How can I edit this code?
+---
 
-There are several ways of editing your application.
+## 🤖 Declaración de Uso de IA
 
-**Use Lovable**
+Este proyecto ha sido desarrollado con la asistencia de herramientas de Inteligencia Artificial (Claude AI de Anthropic) y Lovable como parte del proceso de aprendizaje en el curso de Desarrollo de Software.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/f4c3a6cf-a771-4f10-97b4-fd700ec92064) and start prompting.
+**¿Cómo usamos IA?**
+- Configuración de CI/CD y testing
+- Generación de código boilerplate
+- Resolución de problemas técnicos
+- Documentación
 
-Changes made via Lovable will be committed automatically to this repo.
+**¿Qué hicimos nosotros?**
+- Diseño de la arquitectura
+- Lógica de negocio y funcionalidades
+- Decisiones de diseño UX/UI
+- Validación y revisión del código
 
-**Use your preferred IDE**
+Creemos en la transparencia y en el uso ético de la IA como herramienta de apoyo al aprendizaje.
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+---
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+## 🛠️ Tecnologías
 
-Follow these steps:
+### Frontend
+| Tecnología | Versión | Propósito |
+|-----------|---------|-----------|
+| React | 18.3.1 | UI Library |
+| Vite | 5.4.19 | Build Tool |
+| TypeScript | 5.8.3 | Type Safety |
+| Tailwind CSS | 3.4.17 | Styling |
+| Zustand | 5.0.8 | State Management |
+| React Router | 6.30.1 | Routing |
+| Shadcn/ui | Latest | UI Components |
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+### Backend
+| Tecnología | Versión | Propósito |
+|-----------|---------|-----------|
+| Supabase | 2.75.0 | Backend as a Service |
+| PostgreSQL | 16 | Database |
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+### Testing & CI/CD
+| Tecnología | Versión | Propósito |
+|-----------|---------|-----------|
+| Vitest | 2.1.9 | Test Framework |
+| Testing Library | 16.1.0 | Component Testing |
+| Zod | 3.25.76 | Schema Validation |
+| GitHub Actions | Latest | CI/CD |
+| Vercel | Latest | Deploy & Hosting |
 
-# Step 3: Install the necessary dependencies.
-npm i
+---
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+## 🚀 Instalación
+
+```bash
+# Clonar repositorio
+git clone https://github.com/famososdevelopers/trust-proof.git
+cd trust-proof
+
+# Instalar dependencias
+npm install
+
+# Configurar variables de entorno
+# Crear archivo .env.local con:
+# VITE_SUPABASE_URL=tu_url
+# VITE_SUPABASE_ANON_KEY=tu_key
+
+# Iniciar desarrollo
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+---
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## 📝 Scripts
 
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/f4c3a6cf-a771-4f10-97b4-fd700ec92064) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+npm run dev          # Servidor de desarrollo
+npm run build        # Build para producción
+npm test             # Ejecutar tests
+npm run lint         # Linter
+```

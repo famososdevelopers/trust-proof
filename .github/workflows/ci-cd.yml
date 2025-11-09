@@ -1,0 +1,124 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Necesario para obtener todos los tags
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run linter
+      run: npm run lint
+      continue-on-error: true
+    
+    - name: Run tests
+      run: npm test
+    
+    - name: Build project
+      run: npm run build
+      env:
+        VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: build-${{ github.sha }}
+        path: dist/
+        retention-days: 7
+
+  create-release:
+    needs: build-and-test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: write
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+    
+    - name: Get current date
+      id: date
+      run: echo "date=$(date +'%Y.%m.%d-%H%M')" >> $GITHUB_OUTPUT
+    
+    - name: Get latest tag
+      id: previoustag
+      run: |
+        git fetch --tags
+        LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+        echo "tag=$LATEST_TAG" >> $GITHUB_OUTPUT
+    
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        echo "notes<<EOF" >> $GITHUB_OUTPUT
+        echo "## 🚀 Release Automático - Code Freeze" >> $GITHUB_OUTPUT
+        echo "" >> $GITHUB_OUTPUT
+        echo "**Fecha:** $(date +'%Y-%m-%d %H:%M:%S')" >> $GITHUB_OUTPUT
+        echo "**Commit:** ${{ github.sha }}" >> $GITHUB_OUTPUT
+        echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_OUTPUT
+        echo "" >> $GITHUB_OUTPUT
+        echo "### ✅ Tests Ejecutados" >> $GITHUB_OUTPUT
+        echo "- Tests de componentes" >> $GITHUB_OUTPUT
+        echo "- Tests de validación de estructura de datos (20 tests)" >> $GITHUB_OUTPUT
+        echo "- Build exitoso" >> $GITHUB_OUTPUT
+        echo "" >> $GITHUB_OUTPUT
+        echo "### 📦 Cambios desde el último release" >> $GITHUB_OUTPUT
+        git log ${{ steps.previoustag.outputs.tag }}..HEAD --pretty=format:"- %s (%h)" --no-merges | head -20 >> $GITHUB_OUTPUT
+        echo "" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Download build artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: build-${{ github.sha }}
+        path: dist/
+    
+    - name: Create ZIP of build
+      run: |
+        cd dist
+        zip -r ../trust-proof-build-${{ steps.date.outputs.date }}.zip .
+        cd ..
+    
+    - name: Create Release
+      uses: softprops/action-gh-release@v1
+      with:
+        tag_name: v${{ steps.date.outputs.date }}
+        name: Release v${{ steps.date.outputs.date }}
+        body: ${{ steps.release_notes.outputs.notes }}
+        draft: false
+        prerelease: false
+        files: |
+          trust-proof-build-${{ steps.date.outputs.date }}.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    
+    - name: Deployment notification
+      run: |
+        echo "✅ Build successful!"
+        echo "🏷️  Tag created: v${{ steps.date.outputs.date }}"
+        echo "📦 Release published with build artifacts"
+        echo "🚀 Vercel will automatically deploy this commit"
+        echo "📝 Commit SHA: ${{ github.sha }}"
+        echo "👤 Triggered by: ${{ github.actor }}"
