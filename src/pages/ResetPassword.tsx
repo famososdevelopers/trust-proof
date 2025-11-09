@@ -39,7 +39,7 @@ const ResetPassword = () => {
 
       toast.success('Contraseña actualizada correctamente');
       navigate('/auth');
-    } catch (error: any) {
+    } catch (error) {
       toast.error(translateAuthError(error.message));
     } finally {
       setLoading(false);

@@ -28,7 +28,7 @@ const ForgotPassword = () => {
 
       setEmailSent(true);
       toast.success('Revisa tu email para restablecer tu contraseña');
-    } catch (error: any) {
+    } catch (error) {
       toast.error(translateAuthError(error.message));
     } finally {
       setLoading(false);
