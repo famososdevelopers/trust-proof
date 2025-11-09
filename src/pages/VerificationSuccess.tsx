@@ -9,7 +9,6 @@ const VerificationSuccess = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Opcional: redirigir automáticamente después de 3 segundos
     const timer = setTimeout(() => {
       navigate('/');
     }, 3000);
