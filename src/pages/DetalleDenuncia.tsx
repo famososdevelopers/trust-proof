@@ -1,12 +1,19 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, ArrowLeft, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, ArrowLeft, Trash2, MoreVertical, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import Navbar from '@/components/Navbar';
+import ReportarDenunciaModal from '@/components/ReportarDenunciaModal';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
@@ -43,6 +50,8 @@ const DetalleDenuncia = () => {
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [isLiked, setIsLiked] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [showReporteModal, setShowReporteModal] = useState(false);
+  const [yaReportado, setYaReportado] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -50,6 +59,7 @@ const DetalleDenuncia = () => {
       fetchComentarios();
       if (user) {
         checkLikeStatus();
+        checkReporteStatus();
       }
     }
   }, [id, user]);
@@ -102,6 +112,25 @@ const DetalleDenuncia = () => {
       setIsLiked(!!data);
     } catch (error) {
       console.error('Error checking like status:', error);
+    }
+  };
+
+  const checkReporteStatus = async () => {
+    if (!user || !id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('moderaciones')
+        .select('id')
+        .eq('denuncia_id', id)
+        .eq('admin_id', user.id)
+        .eq('accion', 'reportar')
+        .maybeSingle();
+
+      if (error && error.code !== 'PGRST116') throw error;
+      setYaReportado(!!data);
+    } catch (error) {
+      console.error('Error checking reporte status:', error);
     }
   };
 
@@ -180,6 +209,29 @@ const DetalleDenuncia = () => {
     }
   };
 
+  const handleReportar = async ({ comentario }: { comentario: string }) => {
+    if (!user || !id) return;
+
+    try {
+      const { error } = await supabase
+        .from('moderaciones')
+        .insert({
+          denuncia_id: id,
+          admin_id: user.id,
+          comentario,
+          accion: 'en_revision',
+        });
+
+      if (error) throw error;
+
+      setYaReportado(true);
+      toast.success('Reporte enviado correctamente. Será revisado por el equipo de moderación.');
+    } catch (error) {
+      console.error('Error creating reporte:', error);
+      throw error;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-background">
@@ -214,6 +266,10 @@ const DetalleDenuncia = () => {
         return <Badge variant="outline">{denuncia.estado}</Badge>;
     }
   };
+  
+  const handleModeracionCreada = () => {
+    fetchDenuncia(); 
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -232,13 +288,37 @@ const DetalleDenuncia = () => {
         <Card className="shadow-card-hover mb-6">
           <CardHeader>
             <div className="flex justify-between items-start">
-              <div>
+              <div className="flex-1">
                 <CardTitle className="text-2xl mb-2">{denuncia.nombre_asociado}</CardTitle>
                 {denuncia.mail_asociado && (
                   <p className="text-muted-foreground">{denuncia.mail_asociado}</p>
                 )}
               </div>
-              {getEstadoBadge()}
+              <div className="flex items-center gap-2">
+                {getEstadoBadge()}
+                
+                {/* Menú de opciones */}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-8 w-8">
+                      <MoreVertical className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onClick={() => setShowReporteModal(true)}
+                      disabled={yaReportado}
+                      className={cn(
+                        "cursor-pointer",
+                        yaReportado && "opacity-50 cursor-not-allowed"
+                      )}
+                    >
+                      <Flag className="h-4 w-4 mr-2 text-orange-600" />
+                      <span>{yaReportado ? 'Ya reportado' : 'Reportar denuncia'}</span>
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
             </div>
           </CardHeader>
           <CardContent>
@@ -330,6 +410,14 @@ const DetalleDenuncia = () => {
           </CardContent>
         </Card>
       </div>
+
+      <ReportarDenunciaModal
+        isOpen={showReporteModal}
+        onClose={() => setShowReporteModal(false)}
+        denunciaId={id!}
+        onReportar={handleReportar}
+        onSuccess={handleModeracionCreada}
+      />
     </div>
   );
 };
