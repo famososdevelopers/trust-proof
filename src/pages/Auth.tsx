@@ -8,6 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
+import { translateAuthError } from '@/utils/errorMessages';
 
 const authSchema = z.object({
   email: z.string().email({ message: 'Email inválido' }),
@@ -37,11 +38,7 @@ const Auth = () => {
         });
 
         if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Credenciales inválidas');
-          } else {
-            toast.error(error.message);
-          }
+          toast.error(translateAuthError(error.message));
           return;
         }
 
@@ -51,34 +48,19 @@ const Auth = () => {
         const { data: authData, error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
+          options: {
+            emailRedirectTo: `${window.location.origin}/verification-success`,
+          },
         });
 
         if (signUpError) {
-          if (signUpError.message.includes('already registered')) {
-            toast.error('Este email ya está registrado');
-          } else {
-            toast.error(signUpError.message);
-          }
+          toast.error(translateAuthError(signUpError.message));
           return;
         }
 
-        if (authData.user) {
-          const { error: profileError } = await supabase
-            .from('users')
-            .insert({
-              id: authData.user.id,
-              email: formData.email,
-              name: formData.email.split('@')[0],
-              role: 'user',
-            });
+        toast.success('Por favor verifica tu email para continuar');
+        navigate('/verify-email');
 
-          if (profileError) {
-            console.error('Error creating user profile:', profileError);
-          }
-
-          toast.success('Cuenta creada exitosamente');
-          navigate('/');
-        }
       }
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -131,6 +113,17 @@ const Auth = () => {
               />
             </div>
 
+            {isLogin && (
+              <div className="text-right mt-2">
+                <button
+                  type="button"
+                  onClick={() => navigate('/forgot-password')}
+                  className="text-sm text-muted-foreground hover:text-primary hover:underline"
+                >
+                  ¿Olvidaste tu contraseña?
+                </button>
+              </div>
+            )}
             <Button type="submit" className="w-full" disabled={loading}>
               {loading ? 'Cargando...' : isLogin ? 'Iniciar Sesión' : 'Registrarse'}
             </Button>

@@ -128,7 +128,7 @@ const Home = () => {
       }
 
       await fetchDenuncias();
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error toggling like:', error);
       toast.error('Error al procesar el like');
     }

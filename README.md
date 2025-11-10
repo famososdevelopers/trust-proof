@@ -56,6 +56,18 @@ Creemos en la transparencia y en el uso ético de la IA como herramienta de apoy
 
 ---
 
+## 🏗️ Arquitectura
+
+- **Capas principales**: `src/main.tsx` monta la aplicación y encapsula `App` con `React Query`, proveedores de tooltips y el enrutador. `App.tsx` define todas las rutas con `React Router` y se suscribe a los cambios de sesión de Supabase para mantener sincronizado el estado global.
+- **Gestión de estado**: `useAuthStore` en `src/stores/authStore.ts` utiliza Zustand para centralizar usuario, sesión y rol. Valida privilegios contra la tabla `users` de Supabase y expone utilidades como `signOut`. Los `ProtectedRoute` consumen este store para bloquear el acceso a vistas privadas mientras muestran estados de carga.
+- **Integraciones externas**: `src/integrations/supabase/` contiene el cliente fuertemente tipado y los contratos con la base de datos. Todas las operaciones de lectura/escritura (`Home`, `NuevaDenuncia`, `MisDenuncias`, etc.) interactúan con Supabase a través de este cliente.
+- **Componentes y UI**: `src/components/` alberga piezas reutilizables como `Navbar`, `DenunciaCard` y la colección de componentes de interfaz (`components/ui`) generados a partir de shadcn/ui. Tailwind CSS aporta utilidades de estilo y se complementa con los tokens de diseño definidos en `index.css` y `App.css`.
+- **Páginas y rutas**: `src/pages/` agrupa las vistas de dominio (`Auth`, `Home`, `NuevaDenuncia`, `DetalleDenuncia`, `MisDenuncias`, `Moderacion`, `Perfil` y `NotFound`). Cada página encapsula su lógica de datos y delega en componentes presentacionales. `ProtectedRoute` se usa para rutas que requieren autenticación y, en el caso de moderación, se apoya en el flag `isAdmin`.
+- **Utilidades y hooks**: `src/lib/utils.ts` expone helpers compartidos, mientras que `src/hooks/` añade lógica específica (por ejemplo, adaptaciones para mobile o disparadores de notificaciones).
+- **Testing y configuración**: Las pruebas con Vitest residen en `src/test/`, apoyadas por `vitest.config.ts` y `src/test/setup.ts` para preparar el entorno DOM virtual.
+
+---
+
 ## 🚀 Instalación
 
 ```bash
