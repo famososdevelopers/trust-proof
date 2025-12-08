@@ -7,20 +7,7 @@ import Navbar from '@/components/Navbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
-import { Evidencia } from '@/utils/interfaces';
-import { url } from 'inspector';
-
-interface Denuncia {
-  id: string;
-  nombre_asociado: string;
-  mail_asociado: string | null;
-  descripcion: string;
-  estado: string;
-  likes_count: number;
-  comentarios_count: number;
-  created_at: string;
-  evidencias?: Evidencia[];
-}
+import { Denuncia } from '@/utils/interfaces';
 
 const Home = () => {
   const { user } = useAuthStore();

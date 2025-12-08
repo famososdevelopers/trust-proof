@@ -20,18 +20,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { Evidencia } from '@/utils/interfaces';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-
-interface Denuncia {
-  id: string;
-  nombre_asociado: string;
-  mail_asociado: string | null;
-  descripcion: string;
-  estado: string;
-  likes_count: number;
-  comentarios_count: number;
-  created_at: string;
-  user_id: string;
-}
+import { Denuncia } from '@/utils/interfaces';
 
 interface Comentario {
   id: string;

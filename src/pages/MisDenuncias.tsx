@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Paperclip, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -19,17 +19,7 @@ import Navbar from '@/components/Navbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
-
-interface Denuncia {
-  id: string;
-  nombre_asociado: string;
-  mail_asociado: string | null;
-  descripcion: string;
-  estado: string;
-  likes_count: number;
-  comentarios_count: number;
-  created_at: string;
-}
+import { Denuncia } from '@/utils/interfaces';
 
 const MisDenuncias = () => {
   const navigate = useNavigate();
@@ -49,12 +39,19 @@ const MisDenuncias = () => {
     try {
       const { data, error } = await supabase
         .from('denuncias')
-        .select('*')
+        .select('*, evidencias(id, tipo_archivo, url_storage, nombre_archivo, tamano, denuncia_id)')
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDenuncias(data || []);
+      const transformedData = (data || []).map(denuncia => ({
+        ...denuncia,
+        evidencias: denuncia.evidencias.map(evidencia => ({
+          ...evidencia,
+          id: String(evidencia.id)
+        }))
+      }));
+      setDenuncias(transformedData);
     } catch (error) {
       console.error('Error fetching denuncias:', error);
       toast.error('Error al cargar tus denuncias');
@@ -178,6 +175,12 @@ const MisDenuncias = () => {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span>{denuncia.likes_count} likes</span>
                     <span>{denuncia.comentarios_count} comentarios</span>
+                    {denuncia.evidencias.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Paperclip className="h-3 w-3" />
+                        {denuncia.evidencias.length} archivo{denuncia.evidencias.length > 1 ? 's' : ''}
+                      </span>
+                    )}
                     <span>
                       {new Date(denuncia.created_at).toLocaleDateString('es-ES')}
                     </span>
