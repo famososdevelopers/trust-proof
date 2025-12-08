@@ -7,6 +7,8 @@ import Navbar from '@/components/Navbar';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import { Evidencia } from '@/utils/interfaces';
+import { url } from 'inspector';
 
 interface Denuncia {
   id: string;
@@ -17,6 +19,7 @@ interface Denuncia {
   likes_count: number;
   comentarios_count: number;
   created_at: string;
+  evidencias?: Evidencia[];
 }
 
 const Home = () => {
@@ -43,12 +46,21 @@ const Home = () => {
     try {
       const { data, error } = await supabase
         .from('denuncias')
-        .select('*')
+        .select('*, evidencias(id, tipo_archivo, url_storage, nombre_archivo, tamano, denuncia_id)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setDenuncias(data || []);
-      setFilteredDenuncias(data || []);
+      
+      const transformedData = (data || []).map((denuncia: any) => ({
+        ...denuncia,
+        evidencias: (denuncia.evidencias || []).map((ev: any) => ({
+          ...ev,
+          id: String(ev.id),
+        })),
+      }));
+      
+      setDenuncias(transformedData);
+      setFilteredDenuncias(transformedData);
     } catch (error) {
       console.error('Error fetching denuncias:', error);
       toast.error('Error al cargar las denuncias');
