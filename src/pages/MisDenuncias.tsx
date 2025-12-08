@@ -136,7 +136,7 @@ const MisDenuncias = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => navigate(`/denuncia/${denuncia.id}`)}
+                        onClick={() => navigate(`/editar-denuncia/${denuncia.id}`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
