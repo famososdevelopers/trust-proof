@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Heart, MessageCircle, ArrowLeft, Trash2, MoreVertical, Flag } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -14,37 +14,19 @@ import {
 } from '@/components/ui/dropdown-menu';
 import Navbar from '@/components/Navbar';
 import ReportarDenunciaModal from '@/components/ReportarDenunciaModal';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { fetchDenunciaById, type Denuncia } from '@/api/denuncias';
+import { fetchComentariosByDenunciaId, createComentario, deleteComentario, type Comentario } from '@/api/comentarios';
+import { checkLikeStatus, toggleLike } from '@/api/likes';
+import { checkReporteStatus, createModeracion } from '@/api/moderaciones';
 
-interface Denuncia {
-  id: string;
-  nombre_asociado: string;
-  mail_asociado: string | null;
-  descripcion: string;
-  estado: string;
-  likes_count: number;
-  comentarios_count: number;
-  created_at: string;
-  user_id: string;
-}
-
-interface Comentario {
-  id: string;
-  contenido: string;
-  created_at: string;
-  user_id: string;
-  users: {
-    name: string;
-  };
-}
 
 const DetalleDenuncia = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, initialized } = useAuthStore();
   const [denuncia, setDenuncia] = useState<Denuncia | null>(null);
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
   const [nuevoComentario, setNuevoComentario] = useState('');
@@ -53,26 +35,11 @@ const DetalleDenuncia = () => {
   const [showReporteModal, setShowReporteModal] = useState(false);
   const [yaReportado, setYaReportado] = useState(false);
 
-  useEffect(() => {
-    if (id) {
-      fetchDenuncia();
-      fetchComentarios();
-      if (user) {
-        checkLikeStatus();
-        checkReporteStatus();
-      }
-    }
-  }, [id, user]);
+  const loadDenuncia = useCallback(async () => {
+    if (!id) return;
 
-  const fetchDenuncia = async () => {
     try {
-      const { data, error } = await supabase
-        .from('denuncias')
-        .select('*')
-        .eq('id', id)
-        .single();
-
-      if (error) throw error;
+      const data = await fetchDenunciaById(id);
       setDenuncia(data);
     } catch (error) {
       console.error('Error fetching denuncia:', error);
@@ -80,81 +47,128 @@ const DetalleDenuncia = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [id]);
 
-  const fetchComentarios = async () => {
+  const loadComentarios = useCallback(async () => {
+    if (!id) return;
+
     try {
-      const { data, error } = await supabase
-        .from('comentarios')
-        .select('*, users(name)')
-        .eq('denuncia_id', id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setComentarios(data || []);
+      const data = await fetchComentariosByDenunciaId(id);
+      setComentarios(data);
     } catch (error) {
       console.error('Error fetching comentarios:', error);
     }
-  };
+  }, [id]);
 
-  const checkLikeStatus = async () => {
-    if (!user || !id) return;
+  const loadLikeStatus = useCallback(async () => {
+    if (!user?.id || !id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('likes')
-        .select('id')
-        .eq('denuncia_id', id)
-        .eq('user_id', user.id)
-        .maybeSingle();
-
-      if (error) throw error;
-      setIsLiked(!!data);
+      const liked = await checkLikeStatus(id, user.id);
+      setIsLiked(liked);
     } catch (error) {
       console.error('Error checking like status:', error);
     }
-  };
+  }, [user?.id, id]);
 
-  const checkReporteStatus = async () => {
-    if (!user || !id) return;
+  const loadReporteStatus = useCallback(async () => {
+    if (!user?.id || !id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('moderaciones')
-        .select('id')
-        .eq('denuncia_id', id)
-        .eq('admin_id', user.id)
-        .eq('accion', 'reportar')
-        .maybeSingle();
-
-      if (error && error.code !== 'PGRST116') throw error;
-      setYaReportado(!!data);
+      const reported = await checkReporteStatus(id, user.id);
+      setYaReportado(reported);
     } catch (error) {
       console.error('Error checking reporte status:', error);
     }
-  };
+  }, [user?.id, id]);
+
+  useEffect(() => {
+    // Esperar a que la autenticación esté inicializada antes de cargar datos
+    if (!initialized) return;
+
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const loadData = async () => {
+      if (!id) {
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
+      
+      try {
+        await Promise.all([
+          loadDenuncia(),
+          loadComentarios(),
+        ]);
+
+        if (mounted && user?.id) {
+          await Promise.all([
+            loadLikeStatus(),
+            loadReporteStatus(),
+          ]);
+        }
+      } catch (error) {
+        console.error('[DetalleDenuncia] Error loading data:', error);
+        // Reintentar una vez después de un breve delay
+        if (mounted) {
+          setTimeout(async () => {
+            if (mounted && id) {
+              try {
+                await Promise.all([
+                  loadDenuncia(),
+                  loadComentarios(),
+                ]);
+                if (user?.id) {
+                  await Promise.all([
+                    loadLikeStatus(),
+                    loadReporteStatus(),
+                  ]);
+                }
+              } catch (retryError) {
+                console.error('[DetalleDenuncia] Error on retry:', retryError);
+                if (mounted) {
+                  setLoading(false);
+                }
+              }
+            }
+          }, 1000);
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadData();
+
+    // Timeout de seguridad para evitar loading infinito
+    timeoutId = setTimeout(() => {
+      if (mounted) {
+        setLoading(false);
+      }
+    }, 5000); // 5 segundos máximo
+
+    return () => {
+      mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
+  }, [initialized, id, user?.id, loadDenuncia, loadComentarios, loadLikeStatus, loadReporteStatus]);
 
   const handleLike = async () => {
-    if (!user) {
+    if (!user || !id) {
       toast.error('Debes iniciar sesión');
       return;
     }
 
     try {
-      if (isLiked) {
-        await supabase
-          .from('likes')
-          .delete()
-          .eq('denuncia_id', id)
-          .eq('user_id', user.id);
-        setIsLiked(false);
-      } else {
-        await supabase
-          .from('likes')
-          .insert({ denuncia_id: id!, user_id: user.id });
-        setIsLiked(true);
-      }
-      await fetchDenuncia();
+      await toggleLike(id, user.id, isLiked);
+      setIsLiked(!isLiked);
+      await loadDenuncia();
     } catch (error) {
       console.error('Error toggling like:', error);
       toast.error('Error al procesar el like');
@@ -162,7 +176,7 @@ const DetalleDenuncia = () => {
   };
 
   const handleComentario = async () => {
-    if (!user) {
+    if (!user || !id) {
       toast.error('Debes iniciar sesión');
       return;
     }
@@ -173,17 +187,15 @@ const DetalleDenuncia = () => {
     }
 
     try {
-      const { error } = await supabase.from('comentarios').insert({
-        denuncia_id: id!,
+      await createComentario({
+        denuncia_id: id,
         user_id: user.id,
         contenido: nuevoComentario.trim(),
       });
 
-      if (error) throw error;
-
       setNuevoComentario('');
-      await fetchComentarios();
-      await fetchDenuncia();
+      await loadComentarios();
+      await loadDenuncia();
       toast.success('Comentario agregado');
     } catch (error) {
       console.error('Error adding comentario:', error);
@@ -193,15 +205,9 @@ const DetalleDenuncia = () => {
 
   const handleDeleteComentario = async (comentarioId: string) => {
     try {
-      const { error } = await supabase
-        .from('comentarios')
-        .delete()
-        .eq('id', comentarioId);
-
-      if (error) throw error;
-
-      await fetchComentarios();
-      await fetchDenuncia();
+      await deleteComentario(comentarioId);
+      await loadComentarios();
+      await loadDenuncia();
       toast.success('Comentario eliminado');
     } catch (error) {
       console.error('Error deleting comentario:', error);
@@ -213,16 +219,12 @@ const DetalleDenuncia = () => {
     if (!user || !id) return;
 
     try {
-      const { error } = await supabase
-        .from('moderaciones')
-        .insert({
-          denuncia_id: id,
-          admin_id: user.id,
-          comentario,
-          accion: 'en_revision',
-        });
-
-      if (error) throw error;
+      await createModeracion({
+        denuncia_id: id,
+        admin_id: user.id,
+        comentario,
+        accion: 'en_revision',
+      });
 
       setYaReportado(true);
       toast.success('Reporte enviado correctamente. Será revisado por el equipo de moderación.');
@@ -268,7 +270,7 @@ const DetalleDenuncia = () => {
   };
   
   const handleModeracionCreada = () => {
-    fetchDenuncia(); 
+    loadDenuncia(); 
   };
 
   return (

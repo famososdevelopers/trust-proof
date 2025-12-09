@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,45 +16,30 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import Navbar from '@/components/Navbar';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import { fetchDenunciasByUserId, deleteDenuncia, type Denuncia } from '@/api/denuncias';
 
-interface Denuncia {
-  id: string;
-  nombre_asociado: string;
-  mail_asociado: string | null;
-  descripcion: string;
-  estado: string;
-  likes_count: number;
-  comentarios_count: number;
-  created_at: string;
-}
 
 const MisDenuncias = () => {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, initialized } = useAuthStore();
   const [denuncias, setDenuncias] = useState<Denuncia[]>([]);
   const [loading, setLoading] = useState(true);
-
+  
+  // Ref para acceder al estado actual de loading en el listener
+  const loadingRef = useRef(loading);
+  
   useEffect(() => {
-    if (user) {
-      fetchMisDenuncias();
-    }
-  }, [user]);
+    loadingRef.current = loading;
+  }, [loading]);
 
-  const fetchMisDenuncias = async () => {
-    if (!user) return;
+  const loadMisDenuncias = async () => {
+    if (!user?.id) return;
 
     try {
-      const { data, error } = await supabase
-        .from('denuncias')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setDenuncias(data || []);
+      const data = await fetchDenunciasByUserId(user.id);
+      setDenuncias(data);
     } catch (error) {
       console.error('Error fetching denuncias:', error);
       toast.error('Error al cargar tus denuncias');
@@ -63,17 +48,96 @@ const MisDenuncias = () => {
     }
   };
 
+  useEffect(() => {
+    // Esperar a que la autenticación esté inicializada antes de cargar datos
+    if (!initialized) return;
+
+    let mounted = true;
+    let timeoutId: NodeJS.Timeout | null = null;
+
+    const loadData = async () => {
+      if (!user?.id) {
+        setLoading(false);
+        loadingRef.current = false;
+        return;
+      }
+
+      setLoading(true);
+      loadingRef.current = true;
+
+      try {
+        const data = await fetchDenunciasByUserId(user.id);
+
+        if (!mounted) return;
+
+        setDenuncias(data);
+      } catch (error) {
+        console.error('[MisDenuncias] Error fetching denuncias:', error);
+        // Reintentar una vez después de un breve delay
+        if (mounted) {
+          setTimeout(async () => {
+            if (mounted && user?.id) {
+              try {
+                const data = await fetchDenunciasByUserId(user.id);
+                setDenuncias(data);
+              } catch (retryError) {
+                toast.error('Error al cargar tus denuncias');
+                setLoading(false);
+                loadingRef.current = false;
+              }
+            }
+          }, 1000);
+        } else {
+          if (mounted) {
+            toast.error('Error al cargar tus denuncias');
+          }
+        }
+      } finally {
+        if (mounted) {
+          setLoading(false);
+          loadingRef.current = false;
+        }
+      }
+    };
+
+    loadData();
+
+    // Timeout de seguridad para evitar loading infinito
+    timeoutId = setTimeout(() => {
+      if (mounted) {
+        setLoading(false);
+      }
+    }, 5000); // 5 segundos máximo
+
+    // Reintentar carga cuando la página vuelve a ser visible
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && mounted) {
+        // Si todavía está en loading después de volver, forzar a false
+        setTimeout(() => {
+          if (mounted && loadingRef.current) {
+            setLoading(false);
+            loadingRef.current = false;
+          }
+        }, 1000);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      mounted = false;
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [initialized, user?.id]); // Esperar inicialización antes de cargar
+
   const handleDelete = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('denuncias')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
+      await deleteDenuncia(id);
       toast.success('Denuncia eliminada');
-      await fetchMisDenuncias();
+      await loadMisDenuncias();
     } catch (error) {
       console.error('Error deleting denuncia:', error);
       toast.error('Error al eliminar la denuncia');
