@@ -6,10 +6,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Navbar from '@/components/Navbar';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { createDenuncia } from '@/api/denuncias';
 
 const denunciaSchema = z.object({
   nombre_asociado: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -40,15 +40,13 @@ const NuevaDenuncia = () => {
     try {
       const validatedData = denunciaSchema.parse(formData);
 
-      const { error } = await supabase.from('denuncias').insert({
+      await createDenuncia({
         user_id: user.id,
         nombre_asociado: validatedData.nombre_asociado,
         mail_asociado: validatedData.mail_asociado || null,
         descripcion: validatedData.descripcion,
         estado: 'activa',
       });
-
-      if (error) throw error;
 
       toast.success('Denuncia creada exitosamente');
       navigate('/');
