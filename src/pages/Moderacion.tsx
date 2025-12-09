@@ -16,20 +16,11 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import Navbar from '@/components/Navbar';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import { fetchDenunciasForModeration, updateDenunciaEstado, type Denuncia } from '@/api/denuncias';
+import { createModeracion } from '@/api/moderaciones';
 
-interface Denuncia {
-  id: string;
-  nombre_asociado: string;
-  mail_asociado: string | null;
-  descripcion: string;
-  estado: string;
-  likes_count: number;
-  comentarios_count: number;
-  created_at: string;
-}
 
 const Moderacion = () => {
   const navigate = useNavigate();
@@ -45,19 +36,13 @@ const Moderacion = () => {
       navigate('/');
       return;
     }
-    fetchDenunciasModeracion();
+    loadDenunciasModeracion();
   }, [isAdmin, navigate]);
 
-  const fetchDenunciasModeracion = async () => {
+  const loadDenunciasModeracion = async () => {
     try {
-      const { data, error } = await supabase
-        .from('denuncias')
-        .select('*')
-        .in('estado', ['en revisión', 'activa'])
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setDenuncias(data || []);
+      const data = await fetchDenunciasForModeration();
+      setDenuncias(data);
     } catch (error) {
       console.error('Error fetching denuncias:', error);
       toast.error('Error al cargar denuncias');
@@ -72,28 +57,18 @@ const Moderacion = () => {
     setActionLoading(true);
 
     try {
-      const { error: updateError } = await supabase
-        .from('denuncias')
-        .update({ estado: nuevoEstado, updated_at: new Date().toISOString() })
-        .eq('id', denunciaId);
-
-      if (updateError) throw updateError;
-
-      const { error: moderacionError } = await supabase
-        .from('moderaciones')
-        .insert({
-          denuncia_id: denunciaId,
-          admin_id: user.id,
-          accion,
-          comentario: comentarioModeracion || null,
-        });
-
-      if (moderacionError) throw moderacionError;
+      await updateDenunciaEstado(denunciaId, nuevoEstado);
+      await createModeracion({
+        denuncia_id: denunciaId,
+        admin_id: user.id,
+        accion,
+        comentario: comentarioModeracion || null,
+      });
 
       toast.success(`Denuncia ${accion.toLowerCase()} exitosamente`);
       setSelectedDenuncia(null);
       setComentarioModeracion('');
-      await fetchDenunciasModeracion();
+      await loadDenunciasModeracion();
     } catch (error) {
       console.error('Error moderating denuncia:', error);
       toast.error('Error al moderar la denuncia');
