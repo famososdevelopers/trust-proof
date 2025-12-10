@@ -6,7 +6,6 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Navbar from '@/components/Navbar';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { z } from 'zod';
@@ -25,6 +24,7 @@ const ALLOWED_FILE_TYPES = [
 ];
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
 const MAX_FILES = 5;
+import { createDenuncia } from '@/api/denuncias';
 
 const denunciaSchema = z.object({
   nombre_asociado: z.string().min(2, 'El nombre debe tener al menos 2 caracteres').max(100),
@@ -153,10 +153,7 @@ const NuevaDenuncia = () => {
     try {
       const validatedData = denunciaSchema.parse(formData);
 
-      setUploadProgress('Creando denuncia...');
-      const { data: denuncia, error: denunciaError } = await supabase
-      .from('denuncias')
-      .insert({
+      await createDenuncia({
         user_id: user.id,
         nombre_asociado: validatedData.nombre_asociado,
         mail_asociado: validatedData.mail_asociado || null,

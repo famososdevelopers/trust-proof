@@ -17,11 +17,11 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import Navbar from '@/components/Navbar';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import { fetchDenunciasForModeration, updateDenunciaEstado, type Denuncia } from '@/api/denuncias';
+import { createModeracion } from '@/api/moderaciones';
 
-// Interface for evidence
 interface Evidencia {
   id: number;
   denuncia_id: string;
@@ -32,7 +32,6 @@ interface Evidencia {
   created_at: string;
 }
 
-// Interface for moderation records
 interface Moderacion {
   id: string;
   denuncia_id: string;
@@ -40,7 +39,6 @@ interface Moderacion {
   accion: string;
   comentario: string | null;
   fecha: string;
-  // Joined data
   denuncia?: {
     nombre_asociado: string;
     descripcion: string;
@@ -79,7 +77,6 @@ const Moderacion = () => {
     fetchHistorial();
   }, [isAdmin, navigate]);
 
-  // Fetch moderaciones con estado en_revision
   const fetchModeracionesPendientes = async () => {
     try {
       const { data, error } = await supabase
@@ -94,7 +91,6 @@ const Moderacion = () => {
 
       if (error) throw error;
 
-      // Fetch evidencias for each moderacion
       const moderacionesConEvidencias = await Promise.all(
         (data || []).map(async (mod) => {
           const { data: evidencias } = await supabase
@@ -114,7 +110,6 @@ const Moderacion = () => {
     }
   };
 
-  // Fetch moderaciones que NO son en_revision (historial)
   const fetchHistorial = async () => {
     try {
       const { data, error } = await supabase
@@ -129,7 +124,6 @@ const Moderacion = () => {
 
       if (error) throw error;
 
-      // Fetch evidencias for each moderacion
       const moderacionesConEvidencias = await Promise.all(
         (data || []).map(async (mod) => {
           const { data: evidencias } = await supabase
@@ -149,7 +143,6 @@ const Moderacion = () => {
     }
   };
 
-  // Map action to display text
   const getAccionDisplay = (accion: string) => {
     const accionMap: Record<string, string> = {
       'en_revision': 'En Revisión',
@@ -161,7 +154,6 @@ const Moderacion = () => {
     return accionMap[accion] || accion;
   };
 
-  // Get badge variant based on action
   const getAccionBadgeVariant = (accion: string) => {
     switch (accion) {
       case 'mantener':
@@ -178,7 +170,6 @@ const Moderacion = () => {
     }
   };
 
-  // Check if file is an image
   const isImage = (tipo: string | null, nombre: string | null) => {
     if (tipo?.startsWith('image/')) return true;
     if (nombre) {
@@ -188,14 +179,12 @@ const Moderacion = () => {
     return false;
   };
 
-  // Open evidence viewer
   const openEvidenciaViewer = (evidencias: Evidencia[], index: number = 0) => {
     setSelectedEvidencias(evidencias);
     setCurrentEvidenciaIndex(index);
     setEvidenciaModalOpen(true);
   };
 
-  // Navigate evidence
   const nextEvidencia = () => {
     setCurrentEvidenciaIndex((prev) => 
       prev < selectedEvidencias.length - 1 ? prev + 1 : 0
@@ -214,8 +203,6 @@ const Moderacion = () => {
     setActionLoading(true);
 
     try {
-      // Solo actualizar el registro de moderación
-      // El trigger se encarga de actualizar el estado de la denuncia
       const { error: updateModeracionError } = await supabase
         .from('moderaciones')
         .update({ 
@@ -245,7 +232,6 @@ const Moderacion = () => {
     setActionLoading(true);
 
     try {
-      // 1. Actualizar el registro de moderación con acción banear_usuario
       const { error: updateModeracionError } = await supabase
         .from('moderaciones')
         .update({ 
@@ -257,7 +243,6 @@ const Moderacion = () => {
 
       if (updateModeracionError) throw updateModeracionError;
 
-      // 2. Dar de baja al usuario (cambiar role a 'banned')
       const { error: banUserError } = await supabase
         .from('users')
         .update({ 
@@ -267,7 +252,6 @@ const Moderacion = () => {
 
       if (banUserError) throw banUserError;
 
-      // 3. Bajar todas las denuncias del usuario
       const { error: bajaDenunciasError } = await supabase
         .from('denuncias')
         .update({ 

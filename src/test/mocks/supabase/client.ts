@@ -172,25 +172,30 @@ class SupabaseQueryBuilder {
   private orderConfig?: { column: string; ascending: boolean };
   private selectPayload?: Omit<SelectPayloadWithOperation, 'operation' | 'filters' | 'order' | 'table'>;
   private updateValues?: Record<string, unknown>;
-  private operation: 'select' | 'update' | 'delete' | null = null;
+  private insertValues?: Record<string, unknown>[];
+  private operation: 'select' | 'update' | 'delete' | 'insert' | null = null;
   private executed = false;
   private promise: Promise<any> | null = null;
 
   constructor(private table: TableName) {}
 
   select(columns = '*', options?: SelectPayload['options']) {
+    // If we're chaining after insert, keep the operation as 'insert'
+    // and just add the select payload
+    if (this.operation === 'insert' && this.insertValues) {
+      this.selectPayload = { columns, options };
+      return this;
+    }
+
     this.operation = 'select';
     this.selectPayload = { columns, options };
     return this;
   }
 
   insert(values: Record<string, unknown> | Record<string, unknown>[], options?: UpsertOptions) {
-    const payload: InsertPayloadWithOperation = {
-      operation: 'insert',
-      table: this.table,
-      values: Array.isArray(values) ? values : [values],
-    };
-    return executeRpc(payload);
+    this.operation = 'insert';
+    this.insertValues = Array.isArray(values) ? values : [values];
+    return this;
   }
 
   update(values: Record<string, unknown>) {
@@ -240,7 +245,80 @@ class SupabaseQueryBuilder {
       return this.promise;
     }
 
-    if (this.operation === 'select') {
+    if (this.operation === 'insert') {
+      if (!this.insertValues) {
+        throw new Error('insert() requires values');
+      }
+      const payload: InsertPayloadWithOperation = {
+        operation: 'insert',
+        table: this.table,
+        values: this.insertValues,
+      };
+
+      // If select is chained after insert, just return the inserted data
+      // (Supabase's .insert().select() returns the newly inserted rows, not all rows)
+      if (this.selectPayload) {
+        this.promise = executeRpc(payload).then((insertResult) => {
+          if (insertResult.error) {
+            return insertResult;
+          }
+
+          // The insert result already contains the inserted data
+          let data = insertResult.data;
+
+          // Handle single() modifier
+          if (this.selectPayload!.single) {
+            if (!data) {
+              return {
+                data: null,
+                error: { message: 'No rows found' },
+              };
+            }
+            if (Array.isArray(data)) {
+              if (data.length === 0) {
+                return {
+                  data: null,
+                  error: { message: 'No rows found' },
+                };
+              }
+              if (data.length > 1) {
+                return {
+                  data: null,
+                  error: { message: 'Multiple rows found' },
+                };
+              }
+              return {
+                data: data[0],
+                error: null,
+              };
+            }
+            return {
+              data: data,
+              error: null,
+            };
+          }
+
+          // Handle maybeSingle() modifier
+          if (this.selectPayload!.maybeSingle) {
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+              return { data: null, error: null };
+            }
+            if (Array.isArray(data) && data.length > 1) {
+              return { data: null, error: { message: 'Multiple rows found' } };
+            }
+            return {
+              data: Array.isArray(data) ? data[0] : data,
+              error: null,
+            };
+          }
+
+          // Return the data as-is
+          return insertResult;
+        });
+      } else {
+        this.promise = executeRpc(payload);
+      }
+    } else if (this.operation === 'select') {
       if (!this.selectPayload) {
         throw new Error('select() must be called before executing');
       }
@@ -395,6 +473,26 @@ const getSession = async () => ({
   error: null,
 });
 
+const refreshSession = async () => {
+  // In the test environment, just return the current session
+  // or error if there's no session
+  if (!currentSession) {
+    return {
+      data: {
+        session: null,
+      },
+      error: { message: 'No session to refresh' },
+    };
+  }
+
+  return {
+    data: {
+      session: currentSession,
+    },
+    error: null,
+  };
+};
+
 const onAuthStateChange = (callback: AuthListener) => {
   authListeners.add(callback);
   return {
@@ -417,6 +515,7 @@ export const supabase = {
     signUp,
     signOut,
     getSession,
+    refreshSession,
     onAuthStateChange,
   },
   from,
