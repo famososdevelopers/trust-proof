@@ -17,20 +17,8 @@ import ReportarDenunciaModal from '@/components/ReportarDenunciaModal';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Evidencia } from '@/utils/interfaces';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
-import { Denuncia } from '@/utils/interfaces';
-
-interface Comentario {
-  id: string;
-  contenido: string;
-  created_at: string;
-  user_id: string;
-  users: {
-    name: string;
-  };
-}
-import { fetchDenunciaById, type Denuncia } from '@/api/denuncias';
+import { fetchDenunciaById, fetchEvidenciasByDenunciaId, type Denuncia, type Evidencia } from '@/api/denuncias';
 import { fetchComentariosByDenunciaId, createComentario, deleteComentario, type Comentario } from '@/api/comentarios';
 import { checkLikeStatus, toggleLike } from '@/api/likes';
 import { checkReporteStatus, createModeracion } from '@/api/moderaciones';
@@ -50,18 +38,6 @@ const DetalleDenuncia = () => {
   const [yaReportado, setYaReportado] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (id) {
-      fetchDenuncia();
-      fetchComentarios();
-      fetchEvidencias();
-      if (user) {
-        checkLikeStatus();
-        checkReporteStatus();
-      }
-    }
-  }, [id, user]);
-  
   const loadDenuncia = useCallback(async () => {
     if (!id) return;
 
@@ -87,20 +63,16 @@ const DetalleDenuncia = () => {
     }
   }, [id]);
 
-  const fetchEvidencias = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('evidencias')
-        .select('*')
-        .eq('denuncia_id', id)
-        .order('created_at', { ascending: true });
+  const loadEvidencias = useCallback(async () => {
+    if (!id) return;
 
-      if (error) throw error;
-      setEvidencias((data || []).map(item => ({ ...item, id: String(item.id) })));
+    try {
+      const data = await fetchEvidenciasByDenunciaId(id);
+      setEvidencias(data);
     } catch (error) {
       console.error('Error fetching evidencias:', error);
     }
-  };
+  }, [id]);
 
   const loadLikeStatus = useCallback(async () => {
     if (!user?.id || !id) return;
@@ -143,6 +115,7 @@ const DetalleDenuncia = () => {
         await Promise.all([
           loadDenuncia(),
           loadComentarios(),
+          loadEvidencias(),
         ]);
 
         if (mounted && user?.id) {
@@ -161,6 +134,7 @@ const DetalleDenuncia = () => {
                 await Promise.all([
                   loadDenuncia(),
                   loadComentarios(),
+                  loadEvidencias(),
                 ]);
                 if (user?.id) {
                   await Promise.all([
@@ -199,7 +173,7 @@ const DetalleDenuncia = () => {
         clearTimeout(timeoutId);
       }
     };
-  }, [initialized, id, user?.id, loadDenuncia, loadComentarios, loadLikeStatus, loadReporteStatus]);
+  }, [initialized, id, user?.id, loadDenuncia, loadComentarios, loadEvidencias, loadLikeStatus, loadReporteStatus]);
 
   const handleLike = async () => {
     if (!user || !id) {

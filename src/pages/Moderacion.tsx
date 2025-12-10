@@ -20,7 +20,13 @@ import Navbar from '@/components/Navbar';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { fetchDenunciasForModeration, updateDenunciaEstado, type Denuncia } from '@/api/denuncias';
-import { createModeracion } from '@/api/moderaciones';
+import {
+  createModeracion,
+  fetchModeracionesPendientes,
+  fetchHistorialModeraciones,
+  updateModeracion,
+  banUserAndDenuncias
+} from '@/api/moderaciones';
 
 interface Evidencia {
   id: number;
@@ -73,35 +79,14 @@ const Moderacion = () => {
       navigate('/');
       return;
     }
-    fetchModeracionesPendientes();
-    fetchHistorial();
+    loadModeracionesPendientes();
+    loadHistorial();
   }, [isAdmin, navigate]);
 
-  const fetchModeracionesPendientes = async () => {
+  const loadModeracionesPendientes = async () => {
     try {
-      const { data, error } = await supabase
-        .from('moderaciones')
-        .select(`
-          *,
-          denuncia:denuncias(nombre_asociado, descripcion, estado, user_id),
-          admin:users!moderaciones_admin_id_fkey(name, email)
-        `)
-        .eq('accion', 'en_revision')
-        .order('fecha', { ascending: false });
-
-      if (error) throw error;
-
-      const moderacionesConEvidencias = await Promise.all(
-        (data || []).map(async (mod) => {
-          const { data: evidencias } = await supabase
-            .from('evidencias')
-            .select('*')
-            .eq('denuncia_id', mod.denuncia_id);
-          return { ...mod, evidencias: evidencias || [] };
-        })
-      );
-
-      setModeracionesPendientes(moderacionesConEvidencias);
+      const data = await fetchModeracionesPendientes();
+      setModeracionesPendientes(data);
     } catch (error) {
       console.error('Error fetching moderaciones pendientes:', error);
       toast.error('Error al cargar moderaciones pendientes');
@@ -110,31 +95,10 @@ const Moderacion = () => {
     }
   };
 
-  const fetchHistorial = async () => {
+  const loadHistorial = async () => {
     try {
-      const { data, error } = await supabase
-        .from('moderaciones')
-        .select(`
-          *,
-          denuncia:denuncias(nombre_asociado, descripcion, estado, user_id),
-          admin:users!moderaciones_admin_id_fkey(name, email)
-        `)
-        .neq('accion', 'en_revision')
-        .order('fecha', { ascending: false });
-
-      if (error) throw error;
-
-      const moderacionesConEvidencias = await Promise.all(
-        (data || []).map(async (mod) => {
-          const { data: evidencias } = await supabase
-            .from('evidencias')
-            .select('*')
-            .eq('denuncia_id', mod.denuncia_id);
-          return { ...mod, evidencias: evidencias || [] };
-        })
-      );
-
-      setHistorial(moderacionesConEvidencias);
+      const data = await fetchHistorialModeraciones();
+      setHistorial(data);
     } catch (error) {
       console.error('Error fetching historial:', error);
       toast.error('Error al cargar historial de moderaciones');
@@ -199,25 +163,16 @@ const Moderacion = () => {
 
   const handleModeracion = async (moderacionId: string, denunciaId: string, accion: string) => {
     if (!user) return;
-    
+
     setActionLoading(true);
 
     try {
-      const { error: updateModeracionError } = await supabase
-        .from('moderaciones')
-        .update({ 
-          accion,
-          comentario: comentarioModeracion || null,
-          fecha: new Date().toISOString()
-        })
-        .eq('id', moderacionId);
-
-      if (updateModeracionError) throw updateModeracionError;
+      await updateModeracion(moderacionId, accion, comentarioModeracion);
 
       toast.success(`Moderación ${getAccionDisplay(accion).toLowerCase()} exitosamente`);
       setComentarioModeracion('');
-      await fetchModeracionesPendientes();
-      await fetchHistorial();
+      await loadModeracionesPendientes();
+      await loadHistorial();
     } catch (error) {
       console.error('Error moderating:', error);
       toast.error('Error al moderar');
@@ -228,44 +183,16 @@ const Moderacion = () => {
 
   const handleBanearUsuario = async (moderacionId: string, denunciaId: string, userId: string) => {
     if (!user) return;
-    
+
     setActionLoading(true);
 
     try {
-      const { error: updateModeracionError } = await supabase
-        .from('moderaciones')
-        .update({ 
-          accion: 'banear_usuario',
-          comentario: comentarioModeracion || null,
-          fecha: new Date().toISOString()
-        })
-        .eq('id', moderacionId);
-
-      if (updateModeracionError) throw updateModeracionError;
-
-      const { error: banUserError } = await supabase
-        .from('users')
-        .update({ 
-          role: 'banned'
-        })
-        .eq('id', userId);
-
-      if (banUserError) throw banUserError;
-
-      const { error: bajaDenunciasError } = await supabase
-        .from('denuncias')
-        .update({ 
-          estado: 'bajada',
-          updated_at: new Date().toISOString()
-        })
-        .eq('user_id', userId);
-
-      if (bajaDenunciasError) throw bajaDenunciasError;
+      await banUserAndDenuncias(moderacionId, userId, comentarioModeracion);
 
       toast.success('Usuario baneado y denuncias dadas de baja exitosamente');
       setComentarioModeracion('');
-      await fetchModeracionesPendientes();
-      await fetchHistorial();
+      await loadModeracionesPendientes();
+      await loadHistorial();
     } catch (error) {
       console.error('Error banning user:', error);
       toast.error('Error al banear usuario');

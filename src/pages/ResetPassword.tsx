@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { translateAuthError } from '@/utils/errorMessages';
+import { updateUserPassword } from '@/api/auth';
 
 const ResetPassword = () => {
   const navigate = useNavigate();
@@ -31,16 +31,11 @@ const ResetPassword = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.updateUser({
-        password: password,
-      });
-
-      if (error) throw error;
-
+      await updateUserPassword(password);
       toast.success('Contraseña actualizada correctamente');
       navigate('/auth');
-    } catch (error) {
-      toast.error(translateAuthError(error.message));
+    } catch (error: any) {
+      toast.error(translateAuthError(error?.message || 'Error al actualizar la contraseña'));
     } finally {
       setLoading(false);
     }

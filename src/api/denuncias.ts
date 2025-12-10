@@ -1,4 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
+import { deleteAllEvidenciasByDenunciaId } from './evidencias';
+
+export interface Evidencia {
+  id: string;
+  nombre_archivo: string;
+  tipo_archivo: string;
+  tamano: number;
+  url_storage: string;
+  denuncia_id: string;
+}
 
 export interface Denuncia {
   id: string;
@@ -9,6 +19,7 @@ export interface Denuncia {
   likes_count: number;
   comentarios_count: number;
   created_at: string;
+  evidencias?: Evidencia[];
   user_id?: string;
 }
 
@@ -18,7 +29,7 @@ export interface Denuncia {
 export const fetchDenuncias = async (): Promise<Denuncia[]> => {
   const { data, error } = await supabase
     .from('denuncias')
-    .select('*')
+    .select('*, evidencias(*)')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -26,7 +37,13 @@ export const fetchDenuncias = async (): Promise<Denuncia[]> => {
     throw error;
   }
 
-  return data || [];
+  return (data || []).map((denuncia) => ({
+    ...denuncia,
+    evidencias: denuncia.evidencias.map((evidencia) => ({
+      ...evidencia,
+      id: String(evidencia.id),
+    })),
+  }));
 };
 
 /**
@@ -37,7 +54,9 @@ export const fetchDenunciasByUserId = async (
 ): Promise<Denuncia[]> => {
   const { data, error } = await supabase
     .from('denuncias')
-    .select('*')
+    .select(
+      '*, evidencias(id, tipo_archivo, url_storage, nombre_archivo, tamano, denuncia_id)'
+    )
     .eq('user_id', userId)
     .order('created_at', { ascending: false });
 
@@ -46,7 +65,13 @@ export const fetchDenunciasByUserId = async (
     throw error;
   }
 
-  return data || [];
+  return (data || []).map((denuncia) => ({
+    ...denuncia,
+    evidencias: (denuncia.evidencias || []).map((evidencia) => ({
+      ...evidencia,
+      id: String(evidencia.id),
+    })),
+  }));
 };
 
 /**
@@ -101,8 +126,21 @@ export const createDenuncia = async (denunciaData: {
 
 /**
  * Elimina una denuncia por su ID
+ * Primero elimina todas las evidencias asociadas y luego la denuncia
  */
 export const deleteDenuncia = async (id: string): Promise<void> => {
+  // Primero eliminar todas las evidencias asociadas
+  try {
+    await deleteAllEvidenciasByDenunciaId(id);
+  } catch (error) {
+    console.error(
+      '[API] Error deleting evidencias before deleting denuncia:',
+      error
+    );
+    // Continuamos con la eliminación de la denuncia aunque falle la eliminación de evidencias
+  }
+
+  // Luego eliminar la denuncia
   const { error } = await supabase.from('denuncias').delete().eq('id', id);
 
   if (error) {
@@ -164,4 +202,24 @@ export const countDenunciasByUserId = async (
   }
 
   return count || 0;
+};
+
+/**
+ * Obtiene todas las evidencias de una denuncia
+ */
+export const fetchEvidenciasByDenunciaId = async (
+  denunciaId: string
+): Promise<Evidencia[]> => {
+  const { data, error } = await supabase
+    .from('evidencias')
+    .select('*')
+    .eq('denuncia_id', denunciaId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('[API] Error fetching evidencias:', error);
+    throw error;
+  }
+
+  return (data || []).map((item) => ({ ...item, id: String(item.id) }));
 };

@@ -214,6 +214,11 @@ class SupabaseQueryBuilder {
     return this;
   }
 
+  neq(column: string, value: unknown) {
+    this.filters.push({ type: 'neq', column: column as any, value });
+    return this;
+  }
+
   in(column: string, values: unknown[]) {
     this.filters.push({ type: 'in', column: column as any, values });
     return this;

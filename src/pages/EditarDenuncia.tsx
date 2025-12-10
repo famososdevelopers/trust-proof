@@ -6,11 +6,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import Navbar from '@/components/Navbar';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { z } from 'zod';
 import { Upload, X, FileText, Image, File, Loader2, Trash2 } from 'lucide-react';
+import { uploadFile, saveEvidencia, deleteEvidencia } from '@/api/evidencias';
+import { fetchDenunciaById, fetchEvidenciasByDenunciaId, Evidencia } from '@/api/denuncias';
 
 const ALLOWED_FILE_TYPES = [
   'image/jpeg',
@@ -37,13 +38,11 @@ interface FilePreview {
   id: string;
 }
 
-interface EvidenciaExistente {
-  id: number;
-  nombre_archivo: string;
-  tipo_archivo: string;
-  tamano: number;
-  url_storage: string;
-}
+// Usar el tipo Evidencia de la API, pero permitir id como number para compatibilidad
+type EvidenciaExistente = Omit<Evidencia, 'id' | 'denuncia_id'> & {
+  id: number | string;
+  denuncia_id?: string;
+};
 
 const EditarDenuncia = () => {
   const { id } = useParams<{ id: string }>();
@@ -71,14 +70,16 @@ const EditarDenuncia = () => {
   }, [id, user]);
 
   const fetchDenuncia = async () => {
+    if (!id) return;
+    
     try {
-      const { data, error } = await supabase
-        .from('denuncias')
-        .select('*')
-        .eq('id', id)
-        .single();
+      const data = await fetchDenunciaById(id);
 
-      if (error) throw error;
+      if (!data) {
+        toast.error('Denuncia no encontrada');
+        navigate('/mis-denuncias');
+        return;
+      }
 
       // Verificar que el usuario sea el dueño
       if (data.user_id !== user?.id) {
@@ -102,14 +103,17 @@ const EditarDenuncia = () => {
   };
 
   const fetchEvidencias = async () => {
+    if (!id) return;
+    
     try {
-      const { data, error } = await supabase
-        .from('evidencias')
-        .select('*')
-        .eq('denuncia_id', id);
-
-      if (error) throw error;
-      setEvidenciasExistentes(data || []);
+      const data = await fetchEvidenciasByDenunciaId(id);
+      // Convertir el tipo para compatibilidad con EvidenciaExistente
+      setEvidenciasExistentes(
+        data.map((ev) => ({
+          ...ev,
+          id: typeof ev.id === 'string' ? Number(ev.id) : ev.id,
+        })) as EvidenciaExistente[]
+      );
     } catch (error) {
       console.error('Error fetching evidencias:', error);
     }
@@ -175,64 +179,6 @@ const EditarDenuncia = () => {
     setEvidenciasAEliminar(prev => prev.filter(id => id !== evidenciaId));
   };
 
-  const uploadFile = async (file: File, denunciaId: string, userId: string) => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${userId}_${denunciaId}_${crypto.randomUUID()}.${fileExt}`;
-
-    const { error } = await supabase.storage
-      .from('evidencias')
-      .upload(fileName, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
-      
-    if (error) throw error;
-
-    const { data: urlData } = supabase.storage
-      .from('evidencias')
-      .getPublicUrl(fileName);
-
-    return urlData.publicUrl;
-  };
-
-  const saveEvidencia = async (
-    denunciaId: string,
-    file: File,
-    url: string
-  ) => {
-    const { error } = await supabase.from('evidencias').insert({
-      denuncia_id: denunciaId,
-      nombre_archivo: file.name,
-      tipo_archivo: file.type,
-      tamano: file.size,
-      url_storage: url,
-    });
-
-    if (error) throw error;
-  };
-
-  const deleteEvidencia = async (evidencia: EvidenciaExistente) => {
-    // Extraer el nombre del archivo de la URL
-    const urlParts = evidencia.url_storage.split('/');
-    const fileName = urlParts[urlParts.length - 1];
-
-    // Eliminar de Storage
-    const { error: storageError } = await supabase.storage
-      .from('evidencias')
-      .remove([fileName]);
-
-    if (storageError) {
-      console.error('Error deleting from storage:', storageError);
-    }
-
-    // Eliminar de la tabla
-    const { error: dbError } = await supabase
-      .from('evidencias')
-      .delete()
-      .eq('id', evidencia.id);
-
-    if (dbError) throw dbError;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
