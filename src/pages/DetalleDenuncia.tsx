@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Heart, MessageCircle, ArrowLeft, Trash2, MoreVertical, Flag } from 'lucide-react';
+import { Heart, MessageCircle, ArrowLeft, Trash2, MoreVertical, Flag, Image, FileText, File, ExternalLink, Download } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,6 +17,19 @@ import ReportarDenunciaModal from '@/components/ReportarDenunciaModal';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { Evidencia } from '@/utils/interfaces';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Denuncia } from '@/utils/interfaces';
+
+interface Comentario {
+  id: string;
+  contenido: string;
+  created_at: string;
+  user_id: string;
+  users: {
+    name: string;
+  };
+}
 import { fetchDenunciaById, type Denuncia } from '@/api/denuncias';
 import { fetchComentariosByDenunciaId, createComentario, deleteComentario, type Comentario } from '@/api/comentarios';
 import { checkLikeStatus, toggleLike } from '@/api/likes';
@@ -29,12 +42,26 @@ const DetalleDenuncia = () => {
   const { user, initialized } = useAuthStore();
   const [denuncia, setDenuncia] = useState<Denuncia | null>(null);
   const [comentarios, setComentarios] = useState<Comentario[]>([]);
+  const [evidencias, setEvidencias] = useState<Evidencia[]>([]);
   const [nuevoComentario, setNuevoComentario] = useState('');
   const [isLiked, setIsLiked] = useState(false);
   const [loading, setLoading] = useState(true);
   const [showReporteModal, setShowReporteModal] = useState(false);
   const [yaReportado, setYaReportado] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
+  useEffect(() => {
+    if (id) {
+      fetchDenuncia();
+      fetchComentarios();
+      fetchEvidencias();
+      if (user) {
+        checkLikeStatus();
+        checkReporteStatus();
+      }
+    }
+  }, [id, user]);
+  
   const loadDenuncia = useCallback(async () => {
     if (!id) return;
 
@@ -59,6 +86,21 @@ const DetalleDenuncia = () => {
       console.error('Error fetching comentarios:', error);
     }
   }, [id]);
+
+  const fetchEvidencias = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('evidencias')
+        .select('*')
+        .eq('denuncia_id', id)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+      setEvidencias((data || []).map(item => ({ ...item, id: String(item.id) })));
+    } catch (error) {
+      console.error('Error fetching evidencias:', error);
+    }
+  };
 
   const loadLikeStatus = useCallback(async () => {
     if (!user?.id || !id) return;
@@ -217,7 +259,6 @@ const DetalleDenuncia = () => {
 
   const handleReportar = async ({ comentario }: { comentario: string }) => {
     if (!user || !id) return;
-
     try {
       await createModeracion({
         denuncia_id: id,
@@ -229,10 +270,24 @@ const DetalleDenuncia = () => {
       setYaReportado(true);
       toast.success('Reporte enviado correctamente. Será revisado por el equipo de moderación.');
     } catch (error) {
-      console.error('Error creating reporte:', error);
-      throw error;
+        console.error('Error creating reporte:', error);
+        throw error;
     }
+};
+
+  const getFileIcon = (tipo: string) => {
+    if (tipo.startsWith('image/')) return <Image className="w-5 h-5 text-blue-500" />;
+    if (tipo === 'application/pdf') return <FileText className="w-5 h-5 text-red-500" />;
+    return <File className="w-5 h-5 text-gray-500" />;
   };
+
+  const formatFileSize = (bytes: number) => {
+    if (bytes < 1024) return `${bytes} B`;
+    else if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(2)} KB`;
+    else return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  };
+
+  const isImage = (tipo: string) => tipo.startsWith('image/');
 
   if (loading) {
     return (
@@ -326,6 +381,82 @@ const DetalleDenuncia = () => {
           <CardContent>
             <p className="text-foreground mb-4 whitespace-pre-wrap">{denuncia.descripcion}</p>
             
+            {evidencias.length > 0 && (
+              <>
+                <Separator className="my-4" />
+                <div className="space-y-3">
+                  <h3 className="text-sm font-semibold text-muted-foreground">
+                    Evidencias adjuntas ({evidencias.length})
+                  </h3>
+                  
+                  {/* Grid de imágenes */}
+                  {evidencias.some(e => isImage(e.tipo_archivo)) && (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {evidencias
+                        .filter(e => isImage(e.tipo_archivo))
+                        .map((evidencia) => (
+                          <div
+                            key={evidencia.id}
+                            className="relative aspect-square rounded-lg overflow-hidden cursor-pointer hover:opacity-90 transition-opacity border"
+                            onClick={() => setSelectedImage(evidencia.url_storage)}
+                          >
+                            <img
+                              src={evidencia.url_storage}
+                              alt={evidencia.nombre_archivo}
+                              className="w-full h-full object-cover"
+                            />
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                  
+                  {/* Lista de otros archivos */}
+                  {evidencias.some(e => !isImage(e.tipo_archivo)) && (
+                    <div className="space-y-2">
+                      {evidencias
+                        .filter(e => !isImage(e.tipo_archivo))
+                        .map((evidencia) => (
+                          <div
+                            key={evidencia.id}
+                            className="flex items-center gap-3 p-3 bg-muted/50 rounded-lg"
+                          >
+                            {getFileIcon(evidencia.tipo_archivo)}
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-medium truncate">
+                                {evidencia.nombre_archivo}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {formatFileSize(evidencia.tamano)}
+                              </p>
+                            </div>
+                            <div className="flex gap-1">
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                onClick={() => window.open(evidencia.url_storage, '_blank')}
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8"
+                                asChild
+                              >
+                                <a href={evidencia.url_storage} download={evidencia.nombre_archivo}>
+                                  <Download className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
             <div className="flex items-center space-x-4 text-sm text-muted-foreground">
               <span>
                 {new Date(denuncia.created_at).toLocaleDateString('es-ES', {
@@ -414,6 +545,18 @@ const DetalleDenuncia = () => {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={!!selectedImage} onOpenChange={() => setSelectedImage(null)}>
+        <DialogContent className="max-w-3xl p-0">
+          {selectedImage && (
+            <img
+              src={selectedImage}
+              alt="Evidencia ampliada"
+              className="w-full h-auto rounded-lg"
+            />
+          )}
+        </DialogContent>
+      </Dialog>
 
       <ReportarDenunciaModal
         isOpen={showReporteModal}

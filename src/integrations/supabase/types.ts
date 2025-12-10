@@ -100,6 +100,44 @@ export type Database = {
           },
         ]
       }
+      evidencias: {
+        Row: {
+          created_at: string
+          denuncia_id: string
+          id: number
+          nombre_archivo: string | null
+          tamano: number | null
+          tipo_archivo: string | null
+          url_storage: string | null
+        }
+        Insert: {
+          created_at?: string
+          denuncia_id: string
+          id?: number
+          nombre_archivo?: string | null
+          tamano?: number | null
+          tipo_archivo?: string | null
+          url_storage?: string | null
+        }
+        Update: {
+          created_at?: string
+          denuncia_id?: string
+          id?: number
+          nombre_archivo?: string | null
+          tamano?: number | null
+          tipo_archivo?: string | null
+          url_storage?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "evidencias_denuncia_id_fkey"
+            columns: ["denuncia_id"]
+            isOneToOne: false
+            referencedRelation: "denuncias"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       likes: {
         Row: {
           created_at: string | null
