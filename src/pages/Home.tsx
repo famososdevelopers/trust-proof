@@ -34,6 +34,7 @@ const Home = () => {
       const { data, error } = await supabase
         .from('denuncias')
         .select('*, evidencias(id, tipo_archivo, url_storage, nombre_archivo, tamano, denuncia_id)')
+        .in('estado', ['activa', 'en revisión'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;

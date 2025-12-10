@@ -220,26 +220,29 @@ const DetalleDenuncia = () => {
 
   const handleReportar = async ({ comentario }: { comentario: string }) => {
     if (!user || !id) return;
-
     try {
-      const { error } = await supabase
-        .from('moderaciones')
-        .insert({
-          denuncia_id: id,
-          admin_id: user.id,
-          comentario,
-          accion: 'en_revision',
-        });
-
-      if (error) throw error;
-
-      setYaReportado(true);
-      toast.success('Reporte enviado correctamente. Será revisado por el equipo de moderación.');
+        console.log('Insertando moderación:', { denuncia_id: id, admin_id: user.id, accion: 'en_revision' });
+        
+        const { data, error } = await supabase
+            .from('moderaciones')
+            .insert({
+                denuncia_id: id,
+                admin_id: user.id,
+                comentario,
+                accion: 'en_revision',
+            })
+            .select();
+        
+        console.log('Resultado:', data, error);
+        
+        if (error) throw error;
+        setYaReportado(true);
+        toast.success('Reporte enviado correctamente. Será revisado por el equipo de moderación.');
     } catch (error) {
-      console.error('Error creating reporte:', error);
-      throw error;
+        console.error('Error creating reporte:', error);
+        throw error;
     }
-  };
+};
 
   const getFileIcon = (tipo: string) => {
     if (tipo.startsWith('image/')) return <Image className="w-5 h-5 text-blue-500" />;
