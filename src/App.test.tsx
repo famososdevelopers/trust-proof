@@ -31,8 +31,10 @@ vi.mock('@/stores/authStore', () => ({
     user: null,
     session: null,
     loading: false,
+    initialized: false,
     setSession: vi.fn(),
     setLoading: vi.fn(),
+    setInitialized: vi.fn(),
   }))
 }));
 

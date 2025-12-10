@@ -5,11 +5,12 @@ import { useAuthStore } from '@/stores/authStore';
 
 const ensureSessionApplied = async () => {
   const { data } = await supabase.auth.getSession();
-  const { setSession, setLoading } = useAuthStore.getState();
+  const { setSession, setLoading, setInitialized } = useAuthStore.getState();
 
   await act(async () => {
     setSession(data.session);
     setLoading(false);
+    setInitialized(true);
   });
 
   return data.session;
@@ -43,11 +44,12 @@ export const loginAsAdmin = async () => {
 
 export const logout = async () => {
   await supabase.auth.signOut();
-  const { setSession, setUser, setLoading } = useAuthStore.getState();
+  const { setSession, setUser, setLoading, setInitialized } = useAuthStore.getState();
   await act(async () => {
     setSession(null);
     setUser(null);
     setLoading(false);
+    setInitialized(false);
   });
 };
 
