@@ -145,6 +145,41 @@ export const runSelect = <T>(payload: SelectPayload): QueryResult<T> => {
     data = withUsersJoin(ordered as ComentarioRow[]);
   }
 
+  if (payload.table === 'moderaciones') {
+    // Handle joins for moderaciones
+    if (columns.includes('denuncia:denuncias(')) {
+      data = ordered.map((mod: ModeracionRow) => {
+        const denuncia = db.denuncias.find((d) => d.id === mod.denuncia_id);
+        return {
+          ...mod,
+          denuncia: denuncia
+            ? {
+                nombre_asociado: denuncia.nombre_asociado,
+                descripcion: denuncia.descripcion,
+                estado: denuncia.estado,
+                user_id: denuncia.user_id,
+              }
+            : null,
+        };
+      });
+    }
+
+    if (columns.includes('admin:users!moderaciones_admin_id_fkey(')) {
+      data = (data.length > 0 ? data : ordered).map((mod: ModeracionRow & { denuncia?: any }) => {
+        const admin = db.users.find((u) => u.id === mod.admin_id);
+        return {
+          ...mod,
+          admin: admin
+            ? {
+                name: admin.name,
+                email: admin.email,
+              }
+            : null,
+        };
+      });
+    }
+  }
+
   if (payload.single) {
     if (data.length !== 1) {
       return {

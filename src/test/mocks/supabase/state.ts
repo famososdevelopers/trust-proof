@@ -125,7 +125,16 @@ const initialDatabase = (): MockDatabase => {
         created_at: now,
       },
     ],
-    moderaciones: [],
+    moderaciones: [
+      {
+        id: 'moderacion-1',
+        denuncia_id: denuncia2Id,
+        admin_id: adminId,
+        accion: 'en_revision',
+        comentario: null,
+        fecha: now,
+      },
+    ],
   };
 };
 
