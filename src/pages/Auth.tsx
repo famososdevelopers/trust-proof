@@ -6,9 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { z } from 'zod';
 import { translateAuthError } from '@/utils/errorMessages';
+import { signInWithPassword, signUp } from '@/api/auth';
 
 const authSchema = z.object({
   email: z.string().email({ message: 'Email inválido' }),
@@ -32,43 +32,21 @@ const Auth = () => {
       authSchema.parse(formData);
 
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email: formData.email,
-          password: formData.password,
-        });
-
-        if (error) {
-          toast.error(translateAuthError(error.message));
-          return;
-        }
-
+        await signInWithPassword(formData.email, formData.password);
         toast.success('¡Bienvenido!');
         navigate('/');
       } else {
-        const { data: authData, error: signUpError } = await supabase.auth.signUp({
-          email: formData.email,
-          password: formData.password,
-          options: {
-            emailRedirectTo: `${window.location.origin}/verification-success`,
-          },
-        });
-
-        if (signUpError) {
-          toast.error(translateAuthError(signUpError.message));
-          return;
-        }
-
+        await signUp(formData.email, formData.password);
         toast.success('Por favor verifica tu email para continuar');
         navigate('/verify-email');
-
       }
-    } catch (error) {
+    } catch (error: any) {
       if (error instanceof z.ZodError) {
         error.errors.forEach((err) => {
           toast.error(err.message);
         });
       } else {
-        toast.error('Ha ocurrido un error');
+        toast.error(translateAuthError(error?.message || 'Ha ocurrido un error'));
       }
     } finally {
       setLoading(false);

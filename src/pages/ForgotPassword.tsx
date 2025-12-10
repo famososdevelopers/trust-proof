@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { translateAuthError } from '@/utils/errorMessages';
+import { resetPasswordForEmail } from '@/api/auth';
 
 const ForgotPassword = () => {
   const navigate = useNavigate();
@@ -20,16 +20,11 @@ const ForgotPassword = () => {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/reset-password`,
-      });
-
-      if (error) throw error;
-
+      await resetPasswordForEmail(email);
       setEmailSent(true);
       toast.success('Revisa tu email para restablecer tu contraseña');
-    } catch (error) {
-      toast.error(translateAuthError(error.message));
+    } catch (error: any) {
+      toast.error(translateAuthError(error?.message || 'Error al enviar el email'));
     } finally {
       setLoading(false);
     }

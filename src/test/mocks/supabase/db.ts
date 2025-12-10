@@ -12,6 +12,7 @@ import {
 
 export type Filter =
   | { type: 'eq'; column: keyof DenunciaRow | keyof ComentarioRow | keyof LikeRow | keyof ModeracionRow | keyof MockUser; value: unknown }
+  | { type: 'neq'; column: keyof DenunciaRow | keyof ComentarioRow | keyof LikeRow | keyof ModeracionRow | keyof MockUser; value: unknown }
   | { type: 'in'; column: keyof DenunciaRow; values: unknown[] };
 
 export interface QueryPayload {
@@ -62,6 +63,9 @@ const applyFilters = <T extends Record<string, any>>(rows: T[], filters: Filter[
     filters.every((filter) => {
       if (filter.type === 'eq') {
         return row[filter.column as keyof T] === filter.value;
+      }
+      if (filter.type === 'neq') {
+        return row[filter.column as keyof T] !== filter.value;
       }
       if (filter.type === 'in') {
         return filter.values.includes(row[filter.column as keyof T]);
@@ -139,6 +143,41 @@ export const runSelect = <T>(payload: SelectPayload): QueryResult<T> => {
 
   if (payload.table === 'comentarios' && columns.includes('users(')) {
     data = withUsersJoin(ordered as ComentarioRow[]);
+  }
+
+  if (payload.table === 'moderaciones') {
+    // Handle joins for moderaciones
+    if (columns.includes('denuncia:denuncias(')) {
+      data = ordered.map((mod: ModeracionRow) => {
+        const denuncia = db.denuncias.find((d) => d.id === mod.denuncia_id);
+        return {
+          ...mod,
+          denuncia: denuncia
+            ? {
+                nombre_asociado: denuncia.nombre_asociado,
+                descripcion: denuncia.descripcion,
+                estado: denuncia.estado,
+                user_id: denuncia.user_id,
+              }
+            : null,
+        };
+      });
+    }
+
+    if (columns.includes('admin:users!moderaciones_admin_id_fkey(')) {
+      data = (data.length > 0 ? data : ordered).map((mod: ModeracionRow & { denuncia?: any }) => {
+        const admin = db.users.find((u) => u.id === mod.admin_id);
+        return {
+          ...mod,
+          admin: admin
+            ? {
+                name: admin.name,
+                email: admin.email,
+              }
+            : null,
+        };
+      });
+    }
   }
 
   if (payload.single) {
