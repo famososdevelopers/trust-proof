@@ -12,6 +12,7 @@ import DenunciaCard from '@/components/DenunciaCard';
 import Navbar from '@/components/Navbar';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import { Denuncia } from '@/utils/interfaces';
 import { fetchDenuncias, type Denuncia } from '@/api/denuncias';
 import { fetchUserLikes, toggleLike } from '@/api/likes';
 
@@ -33,9 +34,17 @@ const Home = () => {
 
   const loadDenuncias = useCallback(async () => {
     try {
+
+<!--       const { data, error } = await supabase
+        .from('denuncias')
+        .select('*, evidencias(id, tipo_archivo, url_storage, nombre_archivo, tamano, denuncia_id)')
+        .in('estado', ['activa', 'en revisión'])
+        .order('created_at', { ascending: false }); -->
+
       const data = await fetchDenuncias();
       setDenuncias(data);
       setFilteredDenuncias(data);
+
     } catch (error) {
       const err = error as { message?: string; name?: string };
       // Solo mostrar toast si no es un error de red/cancelación

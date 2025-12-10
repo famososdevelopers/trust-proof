@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Pencil, Trash2 } from 'lucide-react';
+import { Paperclip, Pencil, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -18,6 +18,7 @@ import {
 import Navbar from '@/components/Navbar';
 import { useAuthStore } from '@/stores/authStore';
 import { toast } from 'sonner';
+import { Denuncia } from '@/utils/interfaces';
 import { fetchDenunciasByUserId, deleteDenuncia, type Denuncia } from '@/api/denuncias';
 
 
@@ -38,8 +39,21 @@ const MisDenuncias = () => {
     if (!user?.id) return;
 
     try {
-      const data = await fetchDenunciasByUserId(user.id);
-      setDenuncias(data);
+      const { data, error } = await supabase
+        .from('denuncias')
+        .select('*, evidencias(id, tipo_archivo, url_storage, nombre_archivo, tamano, denuncia_id)')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      const transformedData = (data || []).map(denuncia => ({
+        ...denuncia,
+        evidencias: denuncia.evidencias.map(evidencia => ({
+          ...evidencia,
+          id: String(evidencia.id)
+        }))
+      }));
+      setDenuncias(transformedData);
     } catch (error) {
       console.error('Error fetching denuncias:', error);
       toast.error('Error al cargar tus denuncias');
@@ -203,7 +217,7 @@ const MisDenuncias = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        onClick={() => navigate(`/denuncia/${denuncia.id}`)}
+                        onClick={() => navigate(`/editar-denuncia/${denuncia.id}`)}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
@@ -242,6 +256,12 @@ const MisDenuncias = () => {
                   <div className="flex items-center gap-4 text-sm text-muted-foreground">
                     <span>{denuncia.likes_count} likes</span>
                     <span>{denuncia.comentarios_count} comentarios</span>
+                    {denuncia.evidencias.length > 0 && (
+                      <span className="flex items-center gap-1">
+                        <Paperclip className="h-3 w-3" />
+                        {denuncia.evidencias.length} archivo{denuncia.evidencias.length > 1 ? 's' : ''}
+                      </span>
+                    )}
                     <span>
                       {new Date(denuncia.created_at).toLocaleDateString('es-ES')}
                     </span>

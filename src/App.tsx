@@ -20,6 +20,7 @@ import VerifyEmail from './pages/VerifyEmail';
 import VerificationSuccess from './pages/VerificationSuccess';
 import ResetPassword from './pages/ResetPassword';
 import ForgotPassword from './pages/ForgotPassword';
+import EditarDenuncia from "./pages/EditarDenuncia";
 
 const queryClient = new QueryClient();
 
@@ -289,7 +290,15 @@ const AppRoutes = () => {
         }
       />
       <Route
-        path='/mis-denuncias'
+        path="/editar-denuncia/:id"
+        element={
+          <ProtectedRoute>
+            <EditarDenuncia />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/mis-denuncias"
         element={
           <ProtectedRoute>
             <MisDenuncias />
