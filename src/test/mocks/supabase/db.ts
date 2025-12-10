@@ -12,6 +12,7 @@ import {
 
 export type Filter =
   | { type: 'eq'; column: keyof DenunciaRow | keyof ComentarioRow | keyof LikeRow | keyof ModeracionRow | keyof MockUser; value: unknown }
+  | { type: 'neq'; column: keyof DenunciaRow | keyof ComentarioRow | keyof LikeRow | keyof ModeracionRow | keyof MockUser; value: unknown }
   | { type: 'in'; column: keyof DenunciaRow; values: unknown[] };
 
 export interface QueryPayload {
@@ -62,6 +63,9 @@ const applyFilters = <T extends Record<string, any>>(rows: T[], filters: Filter[
     filters.every((filter) => {
       if (filter.type === 'eq') {
         return row[filter.column as keyof T] === filter.value;
+      }
+      if (filter.type === 'neq') {
+        return row[filter.column as keyof T] !== filter.value;
       }
       if (filter.type === 'in') {
         return filter.values.includes(row[filter.column as keyof T]);
